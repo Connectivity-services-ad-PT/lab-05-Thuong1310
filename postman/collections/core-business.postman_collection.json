@@ -1,0 +1,751 @@
+{
+  "info": {
+    "_postman_id": "core-business-contract-tests",
+    "name": "Core Business Contract Tests",
+    "description": "Postman Collection cho Core Business (Nhom A6). Kiểm thử các luồng REST sync với AI Vision và Access Gate, bao gồm đầy đủ 6 folder chức năng theo yêu cầu.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const prefix = pm.environment.get('teamName') || 'team-core';",
+          "pm.variables.set('traceId', prefix + '-' + Date.now());",
+          "pm.request.headers.upsert({ key: 'X-Trace-Id', value: pm.variables.get('traceId') });"
+        ]
+      }
+    }
+  ],
+  "variable": [],
+  "item": [
+    {
+      "name": "00_Health",
+      "item": [
+        {
+          "name": "GET /health - service is alive",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            },
+            "description": "Kiểm tra trạng thái sẵn sàng hoạt động của Core Business service."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response has service status', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('status', 'ok');",
+                  "  pm.expect(json).to.have.property('service');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01_Functional",
+      "item": [
+        {
+          "name": "POST /access/check - happy path ALLOWED",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/access/check",
+              "host": ["{{baseUrl}}"],
+              "path": ["access", "check"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requestId\": \"0196fb3d-4ad7-7d1e-9f49-5d5148d2cafe\",\n  \"cardId\": \"CARD-123456\",\n  \"gateId\": \"GATE-01\",\n  \"direction\": \"IN\",\n  \"timestamp\": \"2026-06-01T10:00:00Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Thẩm định quyền ra vào khép kín - trường hợp thẻ được phép đi qua cổng."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response confirms ALLOWED status', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('decisionId');",
+                  "  pm.expect(json).to.have.property('allow', true);",
+                  "  pm.expect(json).to.have.property('reasonCode', 'ALLOWED');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /access/check - happy path DENIED (OUT_OF_SCHEDULE)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Prefer",
+                "value": "example=successDenied"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/access/check",
+              "host": ["{{baseUrl}}"],
+              "path": ["access", "check"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requestId\": \"0196fb3d-4ad7-7d1e-9f49-5d5148d2caff\",\n  \"cardId\": \"CARD-123456\",\n  \"gateId\": \"GATE-01\",\n  \"direction\": \"IN\",\n  \"timestamp\": \"2026-06-01T02:00:00Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Thẩm định quyền ra vào - trường hợp bị từ chối do ngoài giờ quy định."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response confirms DENIED status', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('allow', false);",
+                  "  pm.expect(['OUT_OF_SCHEDULE', 'TIME_RESTRICTION']).to.include(json.reasonCode);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /policies/access/{policyId} - fetch active policy details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/policies/access/POL-101",
+              "host": ["{{baseUrl}}"],
+              "path": ["policies", "access", "POL-101"]
+            },
+            "description": "Lấy chi tiết cấu hình của chính sách."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response contains policy metadata', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('policyId', 'POL-101');",
+                  "  pm.expect(json).to.have.property('name');",
+                  "  pm.expect(json).to.have.property('status', 'ACTIVE');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /decisions/{decisionId} - fetch previous check decision",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/decisions/0196fb3d-4ad7-7d1e-9f49-5d5148d2caff",
+              "host": ["{{baseUrl}}"],
+              "path": ["decisions", "0196fb3d-4ad7-7d1e-9f49-5d5148d2caff"]
+            },
+            "description": "Tra cứu quyết định kiểm tra."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response contains decision logs', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('decisionId', '0196fb3d-4ad7-7d1e-9f49-5d5148d2caff');",
+                  "  pm.expect(json).to.have.property('cardId');",
+                  "  pm.expect(json).to.have.property('allow');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02_Auth",
+      "item": [
+        {
+          "name": "POST /access/check - valid token is accepted",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/access/check",
+              "host": ["{{baseUrl}}"],
+              "path": ["access", "check"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requestId\": \"0196fb3d-4ad7-7d1e-9f49-5d5148d2cafe\",\n  \"cardId\": \"CARD-123456\",\n  \"gateId\": \"GATE-01\",\n  \"direction\": \"IN\",\n  \"timestamp\": \"2026-06-01T10:00:00Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Gửi request thẩm định với token hợp lệ, mong đợi 200."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Request with valid token returns success', function () {",
+                  "  pm.expect(pm.response.code).to.eql(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /access/check - missing token is rejected on real service",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/access/check",
+              "host": ["{{baseUrl}}"],
+              "path": ["access", "check"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requestId\": \"0196fb3d-4ad7-7d1e-9f49-5d5148d2cafe\",\n  \"cardId\": \"CARD-123456\",\n  \"gateId\": \"GATE-01\",\n  \"direction\": \"IN\",\n  \"timestamp\": \"2026-06-01T10:00:00Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Kiểm thử Auth thật: khi thiếu token, service thật phải trả 401 hoặc 403. Skip trên mock vì Prism không validate auth thật."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const env = pm.environment.get('env') || 'mock';",
+                  "if (env === 'mock') {",
+                  "  pm.test('Skipped on mock: Prism does not enforce real auth', function () {",
+                  "    pm.expect(true).to.eql(true);",
+                  "  });",
+                  "} else {",
+                  "  pm.test('Missing token returns 401 or 403', function () {",
+                  "    pm.expect([401, 403]).to.include(pm.response.code);",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /access/check - invalid token is rejected on real service",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer invalid-token-value"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/access/check",
+              "host": ["{{baseUrl}}"],
+              "path": ["access", "check"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requestId\": \"0196fb3d-4ad7-7d1e-9f49-5d5148d2cafe\",\n  \"cardId\": \"CARD-123456\",\n  \"gateId\": \"GATE-01\",\n  \"direction\": \"IN\",\n  \"timestamp\": \"2026-06-01T10:00:00Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Gửi token sai định dạng, mong đợi 401 hoặc 403 trên service thật."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const env = pm.environment.get('env') || 'mock';",
+                  "if (env === 'mock') {",
+                  "  pm.test('Skipped on mock: invalid token needs real backend validation', function () {",
+                  "    pm.expect(true).to.eql(true);",
+                  "  });",
+                  "} else {",
+                  "  pm.test('Invalid token returns 401 or 403', function () {",
+                  "    pm.expect([401, 403]).to.include(pm.response.code);",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03_Negative",
+      "item": [
+        {
+          "name": "POST /access/check - missing cardId returns validation error",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Prefer",
+                "value": "code=400"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/access/check",
+              "host": ["{{baseUrl}}"],
+              "path": ["access", "check"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requestId\": \"0196fb3d-4ad7-7d1e-9f49-5d5148d2cafe\",\n  \"gateId\": \"GATE-01\",\n  \"direction\": \"IN\",\n  \"timestamp\": \"2026-06-01T10:00:00Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Gửi thiếu trường bắt buộc cardId. Mong đợi lỗi 400 hoặc 422."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Invalid payload returns client error status', function () {",
+                  "  pm.expect([400, 422]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('Error response matches RFC 7807 ProblemDetails', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('type');",
+                  "  pm.expect(json).to.have.property('title');",
+                  "  pm.expect(json).to.have.property('status');",
+                  "  pm.expect(json.status).to.be.within(400, 599);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /policies/access/{policyId} - non-existent policy",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Prefer",
+                "value": "code=404"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/policies/access/POL-999",
+              "host": ["{{baseUrl}}"],
+              "path": ["policies", "access", "POL-999"]
+            },
+            "description": "Tra cứu mã chính sách không tồn tại. Mong đợi lỗi 404."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Non-existent policy returns 404 Not Found', function () {",
+                  "  pm.expect(pm.response.code).to.eql(404);",
+                  "});",
+                  "pm.test('Error response contains detailed message', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('detail');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04_Boundary_Reliability",
+      "item": [
+        {
+          "name": "POST /access/check - boundary date EXPIRED card",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Prefer",
+                "value": "example=successExpired"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/access/check",
+              "host": ["{{baseUrl}}"],
+              "path": ["access", "check"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requestId\": \"0196fb3d-4ad7-7d1e-9f49-5d5148d2cb01\",\n  \"cardId\": \"CARD-123456\",\n  \"gateId\": \"GATE-01\",\n  \"direction\": \"IN\",\n  \"timestamp\": \"2029-06-01T10:00:00Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Kiểm thử trường hợp biên: Thẻ quẹt đã hết hạn sử dụng. Mong đợi từ chối và lý do CARD_EXPIRED."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expired card request returns success status code 200', function () {",
+                  "  pm.expect(pm.response.code).to.eql(200);",
+                  "});",
+                  "pm.test('Response rejects request with CARD_EXPIRED', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.allow).to.eql(false);",
+                  "  pm.expect(json.reasonCode).to.eql('CARD_EXPIRED');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /access/check - boundary gate status LOCKED",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Prefer",
+                "value": "example=successLocked"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/access/check",
+              "host": ["{{baseUrl}}"],
+              "path": ["access", "check"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requestId\": \"0196fb3d-4ad7-7d1e-9f49-5d5148d2cb02\",\n  \"cardId\": \"CARD-123456\",\n  \"gateId\": \"GATE-01\",\n  \"direction\": \"IN\",\n  \"timestamp\": \"2026-06-01T10:00:00Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Kiểm thử trường hợp biên: Cổng vật lý đang bị khóa (Locked) hoặc phong tỏa. Quyết định deny và lý do GATE_LOCKED."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Locked gate request returns 200', function () {",
+                  "  pm.expect(pm.response.code).to.eql(200);",
+                  "});",
+                  "pm.test('Response rejects access with GATE_LOCKED', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.allow).to.eql(false);",
+                  "  pm.expect(json.reasonCode).to.eql('GATE_LOCKED');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05_Consumer_side_Smoke",
+      "item": [
+        {
+          "name": "Consumer smoke - Core can call AI Vision mock /detect",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{aiVisionMockUrl}}/detect",
+              "host": ["{{aiVisionMockUrl}}"],
+              "path": ["detect"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"camera_id\": \"CAM01\",\n  \"image_url\": \"https://example.com/frame.jpg\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Consumer-side smoke test: Core Business gọi kiểm thử API nhận diện của AI Vision mock server."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Core receives success status 200 from AI Vision', function () {",
+                  "  pm.expect(pm.response.code).to.eql(200);",
+                  "});",
+                  "pm.test('Core can parse response body structure', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('detection_id');",
+                  "  pm.expect(json).to.have.property('label');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consumer smoke - Core can fetch Access Gate status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{accessGateMockUrl}}/gates/GATE-01/status",
+              "host": ["{{accessGateMockUrl}}"],
+              "path": ["gates", "GATE-01", "status"]
+            },
+            "description": "Consumer-side smoke test: Core Business gọi kiểm thử lấy trạng thái cổng của Access Gate mock server."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Core receives success status 200 from Access Gate', function () {",
+                  "  pm.expect(pm.response.code).to.eql(200);",
+                  "});",
+                  "pm.test('Core parses GateStatus response correctly', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('gateId', 'GATE-01');",
+                  "  pm.expect(json).to.have.property('status');",
+                  "  pm.expect(['OPEN', 'CLOSED', 'LOCKED', 'FAULT']).to.include(json.status);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "06_Local_only_NonFunctional",
+      "item": [
+        {
+          "name": "POST /access/check - local response SLA validation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/access/check",
+              "host": ["{{baseUrl}}"],
+              "path": ["access", "check"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requestId\": \"0196fb3d-4ad7-7d1e-9f49-5d5148d2cafe\",\n  \"cardId\": \"CARD-123456\",\n  \"gateId\": \"GATE-01\",\n  \"direction\": \"IN\",\n  \"timestamp\": \"2026-06-01T10:00:00Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Kiểm thử SLA độ trễ phản hồi thời gian thực. SLA yêu cầu < 50ms và chỉ chạy trên local thật."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const env = pm.environment.get('env') || 'mock';",
+                  "if (env === 'local') {",
+                  "  pm.test('Real service responds under 50ms SLA threshold', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(50);",
+                  "  });",
+                  "} else {",
+                  "  pm.test('Skipped on mock environment: mock server latency is not reliable evidence', function () {",
+                  "    pm.expect(true).to.eql(true);",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
