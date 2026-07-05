@@ -1,0 +1,27 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Node.js dependencies
+node_modules/
+npm-debug.log*
+
+# Newman reports
+reports/*.html
+reports/*.xml
+
+# Local IDE configs
+pyrefly.toml

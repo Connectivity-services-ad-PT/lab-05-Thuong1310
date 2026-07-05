@@ -1,0 +1,1 @@
+{"event_type":"core.alert.created","source_service":"team-core","alert_id":"ALT-CORE-003","alert_type":"intrusion","severity":"high","message":"Phat hien nguoi la xam nhap khu vuc cam tai Tang 2","target":"security_team","timestamp":"2026-06-25T08:30:00+07:00"}
